@@ -68,6 +68,12 @@
 
   /* fin de manche */
   #fin { text-align: center; padding: 18px 8px 22px; display: none; }
+  /* Trouve l'intrus : tableau serré autour de la grille (sans ligne vide au-dessus) pour laisser la tête visible ;
+     le « +2 s » flotte au-dessus du tableau */
+  body.mode-intrus #tableau { width: fit-content; max-width: calc(100% - 24px); padding: 8px; border-radius: 24px; }
+  body.mode-intrus #nom { position: absolute; left: 0; right: 0; bottom: 100%; margin: 0 0 8px; }
+  body.mode-intrus #grille { width: min(80vw, calc(100vh - 210px), 520px); }
+  body.mode-intrus #fin { width: min(80vw, 520px); }
   #tableau.fini #fin { display: block; }
   #tableau.fini #logos, #tableau.fini #grille, #tableau.fini #nom { display: none; }
   #fin b { display: block; font-size: min(22vw, 110px); line-height: 1; }
@@ -269,6 +275,7 @@ function lancer() {
   $("titre-jeu").textContent = jeu === "logo" ? "Trouve le bon logo" : "Trouve l'intrus";
   $("logos").style.display = jeu === "logo" ? "" : "none";
   $("grille").style.display = jeu === "intrus" ? "" : "none";
+  document.body.classList.toggle("mode-intrus", jeu === "intrus");
   document.body.classList.add("pret");
 }
 function menu() { clearTimeout(suite); chrono(false); document.body.classList.remove("en-jeu", "pret"); $("titre-jeu").textContent = ""; $("compte").textContent = ""; }
