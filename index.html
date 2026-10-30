@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Joue avec moi</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,700;0,900;1,900&display=swap">
+<style>
+  /* Plein écran = caméra frontale ; en bas, un tableau givré où l'on touche la bonne réponse. */
+  :root { --vert: #22C55E; --rouge: #EF4444; --jaune: #FFE53B; --verre: rgba(255,255,255,.2); --bord-verre: rgba(255,255,255,.45);
+    --carte: rgba(255,255,255,.9); --police: "Montserrat", "Avenir Next", "Helvetica Neue", Arial, sans-serif; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; background: #111; color: #fff; overflow: hidden; font-family: var(--police);
+    -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+  #cam { position: fixed; inset: 0; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); background: #1b1b22; }
+  #sans-cam { position: fixed; inset: 0; background: radial-gradient(120% 80% at 50% 20%, #3a3a4a, #101014); display: none; }
+  body.sans-camera #sans-cam { display: block; }
+  /* texte au contour noir, comme ses scores (Montserrat Black, contour ≈ 7,5 %) */
+  .contour { font-weight: 900; text-transform: uppercase; -webkit-text-stroke: .075em #000; paint-order: stroke fill;
+    text-shadow: .04em .06em .12em rgba(0,0,0,.45); }
+
+  #haut { position: fixed; left: 0; right: 0; top: 0; padding: calc(env(safe-area-inset-top, 0px) + 14px) 18px 0;
+    display: flex; flex-direction: column; align-items: center; gap: 4px; pointer-events: none; }
+  #titre-jeu { font-size: min(9.4vw, 46px); line-height: 1; text-align: center; font-style: italic; }
+  #compte { font-size: min(6vw, 28px); color: var(--jaune); pointer-events: auto; padding: 4px 12px; }
+
+  #tableau { position: fixed; left: 12px; right: 12px; bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
+    background: var(--verre); border: 1.5px solid var(--bord-verre); border-radius: 28px; padding: 14px;
+    -webkit-backdrop-filter: blur(18px) saturate(1.4); backdrop-filter: blur(18px) saturate(1.4);
+    box-shadow: 0 18px 50px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.5); display: none; }
+  body.en-jeu #tableau { display: block; }
+  #nom { text-align: center; font-size: min(5.6vw, 26px); min-height: 1.3em; margin-bottom: 10px; opacity: 0; transition: opacity .25s; }
+  #tableau.repondu #nom { opacity: 1; }
+
+  /* Trouve le bon logo : 2 cartes côte à côte */
+  #logos { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .choix { position: relative; aspect-ratio: 1; background: var(--carte); border-radius: 20px; border: 5px solid transparent;
+    transition: transform .3s cubic-bezier(.3,1.6,.5,1), opacity .3s, border-color .2s; }
+  .choix img { position: absolute; inset: 12%; width: 76%; height: 76%; object-fit: contain; pointer-events: none; }
+  .choix .lettre { position: absolute; left: 10px; top: 6px; color: #111; font-weight: 900; font-size: min(5vw, 22px); opacity: .35; }
+
+  /* Trouve l'intrus : grille d'emoji */
+  #grille { display: grid; gap: 0; background: var(--carte); border-radius: 18px; padding: 6px; aspect-ratio: 1; width: 100%; }
+  #grille > div { position: relative; display: flex; align-items: center; justify-content: center; line-height: 1;
+    font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif; border-radius: 50%;
+    transition: opacity .25s, transform .3s cubic-bezier(.3,1.6,.5,1); }
+  #tableau.repondu #grille > div:not(.bon):not(.faux) { opacity: .15; }
+
+  /* réponses */
+  .bon { border-color: var(--vert) !important; transform: scale(1.06); }
+  #grille > .bon { box-shadow: 0 0 0 .32em var(--vert); transform: scale(1.35); z-index: 1; background: #fff; }
+  .faux { border-color: var(--rouge) !important; animation: tremble .4s; }
+  #grille > .faux { box-shadow: 0 0 0 .28em var(--rouge); }
+  #tableau.repondu .choix:not(.bon):not(.faux) { opacity: .35; }
+  .pastille { position: absolute; right: -8px; top: -8px; width: 42px; height: 42px; border-radius: 50%; display: flex;
+    align-items: center; justify-content: center; font-weight: 900; font-size: 24px; color: #fff; border: 3px solid #000;
+    animation: pop .3s cubic-bezier(.3,1.8,.5,1); z-index: 2; }
+  #grille .pastille { width: 1.3em; height: 1.3em; font-size: .9em; right: -.5em; top: -.6em; border-width: 2px; }
+  .bon .pastille { background: var(--vert); }
+  .faux .pastille { background: var(--rouge); }
+  @keyframes pop { from { transform: scale(0); } to { transform: scale(1); } }
+  @keyframes tremble { 20%, 60% { translate: -6px 0; } 40%, 80% { translate: 6px 0; } }
+
+  /* fin de manche */
+  #fin { text-align: center; padding: 18px 8px 22px; display: none; }
+  #tableau.fini #fin { display: block; }
+  #tableau.fini #logos, #tableau.fini #grille, #tableau.fini #nom { display: none; }
+  #fin b { display: block; font-size: min(22vw, 110px); line-height: 1; }
+  #fin span { display: block; font-size: min(6.4vw, 30px); margin-top: 8px; }
+
+  /* écran « prêt » (le temps de lancer l'enregistrement d'écran) */
+  #pret { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; text-align: center; padding: 24px;
+    font-size: min(7vw, 34px); line-height: 1.2; }
+  body.pret #pret { display: flex; }
+
+  /* menu */
+  #menu { position: fixed; left: 16px; right: 16px; top: 50%; transform: translateY(-50%); max-width: 460px; margin: 0 auto;
+    background: rgba(20,20,26,.72); border: 1.5px solid var(--bord-verre); border-radius: 28px; padding: 22px 18px;
+    -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px); display: flex; flex-direction: column; gap: 16px; }
+  body.en-jeu #menu, body.pret #menu { display: none; }
+  #menu h2 { font-size: 30px; text-align: center; font-style: italic; }
+  #menu p { font-size: 14px; font-weight: 700; color: #cfcfd6; text-align: center; line-height: 1.4; }
+  .ligne { display: flex; gap: 8px; }
+  .ligne button { flex: 1; font: 900 16px var(--police); text-transform: uppercase; color: #fff; background: rgba(255,255,255,.1);
+    border: 2px solid rgba(255,255,255,.25); border-radius: 14px; padding: 14px 6px; }
+  .ligne button.choisi { background: var(--jaune); color: #000; border-color: var(--jaune); }
+  #go { font: 900 22px var(--police); text-transform: uppercase; background: var(--vert); color: #000; border: 0; border-radius: 16px; padding: 16px; }
+</style>
+</head>
+<body class="sans-camera">
+<video id="cam" autoplay playsinline muted></video>
+<div id="sans-cam"></div>
+
+<div id="haut">
+  <div id="titre-jeu" class="contour"></div>
+  <div id="compte" class="contour"></div>
+</div>
+
+<div id="tableau">
+  <div id="nom" class="contour"></div>
+  <div id="logos">
+    <div class="choix" data-c="A"><span class="lettre">A</span><img id="imgA" alt=""></div>
+    <div class="choix" data-c="B"><span class="lettre">B</span><img id="imgB" alt=""></div>
+  </div>
+  <div id="grille"></div>
+  <div id="fin" class="contour"><b id="fin-score"></b><span>Et toi, t'as fait combien ?</span></div>
+</div>
+
+<div id="pret" class="contour">Lance l'enregistrement d'écran<br>puis touche pour commencer</div>
+
+<div id="menu">
+  <h2 class="contour">Joue avec moi</h2>
+  <div class="ligne" id="choix-jeu">
+    <button data-jeu="logo" class="choisi">Bon logo</button>
+    <button data-jeu="intrus">Intrus</button>
+  </div>
+  <div class="ligne" id="choix-manche">
+    <button data-m="0" class="choisi">Manche 1</button>
+    <button data-m="1">Manche 2</button>
+    <button data-m="2">Manche 3</button>
+  </div>
+  <button id="go">C'est parti</button>
+  <p>Touche la bonne réponse : elle s'allume et on passe à la suivante.<br>Appui long sur le compteur en haut = retour au menu.</p>
+</div>
+
+<script src="logos.js"></script>
+<script>
+// Trouve l'intrus : [emoji de la grille, intrus] — les mêmes manches que l'écran du tournage du 28-10.
+const INTRUS = [
+  { taille: 6, paires: [["🙂", "🙃"], ["📪", "📫"], ["🐪", "🐫"], ["🇸🇳", "🇲🇱"], ["🕐", "🕜"], ["😞", "😔"], ["👆", "☝️"], ["🔒", "🔓"]] },
+  { taille: 9, paires: [["😀", "😁"], ["😐", "😑"], ["🔁", "🔂"], ["📁", "📂"], ["🇦🇹", "🇱🇻"], ["😺", "😸"], ["📃", "📄"], ["😗", "😙"]] },
+  { taille: 12, paires: [["😃", "😄"], ["😗", "😚"], ["🕐", "🕑"], ["🇳🇱", "🇱🇺"], ["😮", "😯"], ["🙁", "☹️"], ["✋", "🤚"], ["🔈", "🔉"]] },
+];
+const LOGOS = window.MANCHES;
+const $ = id => document.getElementById(id);
+const tableau = $("tableau");
+let jeu = "logo", manche = 0, items = [], k = 0, bons = 0, verrou = false, suite;
+
+// précharge les logos : aucune attente pendant l'enregistrement
+LOGOS.forEach(m => m.logos.forEach(l => [l.a, l.b].forEach(src => { const i = new Image(); i.src = src; })));
+
+async function camera() {
+  if (document.body.classList.contains("camera-ok")) return;
+  try {
+    const flux = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false });
+    $("cam").srcObject = flux;
+    document.body.classList.replace("sans-camera", "camera-ok");
+  } catch (e) { console.warn("caméra indisponible", e); }
+}
+
+// L'intrus tombe à chaque grille dans un quart différent, jamais deux fois sur la même case.
+function grillesIntrus(m) {
+  const n = m.taille, moitie = Math.ceil(n / 2), prises = new Set();
+  let quarts = [];
+  return m.paires.map(([fond, intrus]) => {
+    if (!quarts.length) quarts = [0, 1, 2, 3].sort(() => Math.random() - .5);
+    const q = quarts.pop(), droite = q % 2, bas = q > 1;
+    let col, ligne;
+    do {
+      col = (droite ? moitie : 0) + Math.floor(Math.random() * (droite ? n - moitie : moitie));
+      ligne = (bas ? moitie : 0) + Math.floor(Math.random() * (bas ? n - moitie : moitie));
+    } while (prises.has(col + "," + ligne));
+    prises.add(col + "," + ligne);
+    return { fond, intrus, col, ligne, n };
+  });
+}
+
+function compteur() { $("compte").textContent = "✓ " + bons + "  ·  " + Math.min(k + 1, items.length) + "/" + items.length; }
+
+function afficher() {
+  verrou = false;
+  tableau.className = "";
+  $("nom").textContent = "";
+  compteur();
+  if (k >= items.length) {
+    tableau.classList.add("fini");
+    $("fin-score").textContent = bons + " / " + items.length;
+    $("compte").textContent = "Terminé";
+    return;
+  }
+  const it = items[k];
+  if (jeu === "logo") {
+    $("imgA").src = it.a; $("imgB").src = it.b;
+    document.querySelectorAll(".choix").forEach(c => { c.className = "choix"; c.querySelector(".pastille")?.remove(); });
+  } else {
+    const g = $("grille"), n = it.n;
+    g.style.gridTemplateColumns = g.style.gridTemplateRows = `repeat(${n}, 1fr)`;
+    let html = "";
+    for (let l = 0; l < n; l++) for (let c = 0; c < n; c++) {
+      const intrus = l === it.ligne && c === it.col;
+      html += `<div data-i="${intrus ? 1 : 0}">${intrus ? it.intrus : it.fond}</div>`;
+    }
+    g.innerHTML = html;
+    const cote = (g.clientWidth - 12) / n;
+    g.querySelectorAll("div").forEach(d => d.style.fontSize = (cote * .78) + "px");
+  }
+}
+
+function pastille(el, ok) { const p = document.createElement("span"); p.className = "pastille"; p.textContent = ok ? "✓" : "✗"; el.appendChild(p); }
+
+function repondre(el, ok, bonEl, nom) {
+  if (verrou) return;
+  verrou = true;
+  if (ok) bons++;
+  el.classList.add(ok ? "bon" : "faux"); pastille(el, ok);
+  if (!ok) { bonEl.classList.add("bon"); pastille(bonEl, true); }
+  if (nom) $("nom").textContent = nom;
+  tableau.classList.add("repondu");
+  compteur();
+  suite = setTimeout(() => { k++; afficher(); }, ok ? 1100 : 1700);
+}
+
+document.querySelectorAll(".choix").forEach(c => c.addEventListener("pointerdown", () => {
+  const it = items[k]; if (!it || jeu !== "logo") return;
+  repondre(c, c.dataset.c === it.bon, document.querySelector(`.choix[data-c="${it.bon}"]`), it.nom);
+}));
+$("grille").addEventListener("pointerdown", e => {
+  const d = e.target.closest("#grille > div"); if (!d || !items[k]) return;
+  repondre(d, d.dataset.i === "1", $("grille").querySelector('[data-i="1"]'));
+});
+tableau.addEventListener("pointerdown", () => { if (tableau.classList.contains("fini")) menu(); });
+
+function lancer() {
+  items = jeu === "logo" ? LOGOS[manche].logos : grillesIntrus(INTRUS[manche]);
+  k = 0; bons = 0;
+  $("titre-jeu").textContent = jeu === "logo" ? "Trouve le bon logo" : "Trouve l'intrus";
+  $("logos").style.display = jeu === "logo" ? "" : "none";
+  $("grille").style.display = jeu === "intrus" ? "" : "none";
+  document.body.classList.add("pret");
+}
+function menu() { clearTimeout(suite); document.body.classList.remove("en-jeu", "pret"); $("titre-jeu").textContent = ""; $("compte").textContent = ""; }
+
+$("choix-jeu").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return;
+  jeu = b.dataset.jeu; $("choix-jeu").querySelectorAll("button").forEach(x => x.classList.toggle("choisi", x === b)); });
+$("choix-manche").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return;
+  manche = +b.dataset.m; $("choix-manche").querySelectorAll("button").forEach(x => x.classList.toggle("choisi", x === b)); });
+$("go").addEventListener("click", () => { camera(); lancer(); });
+$("pret").addEventListener("pointerdown", () => { document.body.classList.remove("pret"); document.body.classList.add("en-jeu"); afficher(); });
+
+// appui long sur le compteur = retour au menu (rien de visible à l'enregistrement)
+let minuteur;
+$("compte").addEventListener("pointerdown", () => { minuteur = setTimeout(menu, 700); });
+["pointerup", "pointerleave", "pointercancel"].forEach(t => $("compte").addEventListener(t, () => clearTimeout(minuteur)));
+
+camera();
+</script>
+</body>
+</html>
