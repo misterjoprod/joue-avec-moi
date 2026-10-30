@@ -27,7 +27,8 @@
   #titre-jeu { font-size: min(9.4vw, 46px); line-height: 1; text-align: center; font-style: italic; }
   #compte { font-size: min(6vw, 28px); color: var(--jaune); pointer-events: auto; padding: 4px 12px; }
 
-  #tableau { position: fixed; left: 12px; right: 12px; bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
+  /* le tableau ne dépasse jamais l'écran : sur un écran large (Mac, iPad couché) il reste centré et la grille tient en hauteur */
+  #tableau { position: fixed; left: 0; right: 0; margin: 0 auto; width: min(calc(100% - 24px), 640px); bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
     background: var(--verre); border: 1.5px solid var(--bord-verre); border-radius: 28px; padding: 14px;
     -webkit-backdrop-filter: blur(18px) saturate(1.4); backdrop-filter: blur(18px) saturate(1.4);
     box-shadow: 0 18px 50px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.5); display: none; }
@@ -37,14 +38,14 @@
   #tableau.penalite #nom { opacity: 1; color: var(--rouge); }
 
   /* Trouve le bon logo : 2 cartes côte à côte */
-  #logos { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  #logos { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; width: min(100%, calc(2 * (100vh - 230px))); margin: 0 auto; }
   .choix { position: relative; aspect-ratio: 1; background: var(--carte); border-radius: 20px; border: 5px solid transparent;
     transition: transform .3s cubic-bezier(.3,1.6,.5,1), opacity .3s, border-color .2s; }
   .choix img { position: absolute; inset: 12%; width: 76%; height: 76%; object-fit: contain; pointer-events: none; }
   .choix .lettre { position: absolute; left: 10px; top: 6px; color: #111; font-weight: 900; font-size: min(5vw, 22px); opacity: .35; }
 
   /* Trouve l'intrus : grille d'emoji */
-  #grille { display: grid; gap: 0; background: var(--carte); border-radius: 18px; padding: 6px; aspect-ratio: 1; width: 100%; }
+  #grille { display: grid; gap: 0; background: var(--carte); border-radius: 18px; padding: 6px; aspect-ratio: 1; width: min(100%, calc(100vh - 210px)); margin: 0 auto; }
   #grille > div { position: relative; display: flex; align-items: center; justify-content: center; line-height: 1;
     font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif; border-radius: 50%;
     transition: opacity .25s, transform .3s cubic-bezier(.3,1.6,.5,1); }
