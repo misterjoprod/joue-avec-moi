@@ -130,12 +130,27 @@
 
 <script src="logos.js"></script>
 <script>
-// Trouve l'intrus : [emoji de la grille, intrus] — les mêmes manches que l'écran du tournage du 28-10.
-const INTRUS = [
-  { taille: 6, paires: [["🙂", "🙃"], ["📪", "📫"], ["🐪", "🐫"], ["🇸🇳", "🇲🇱"], ["🕐", "🕜"], ["😞", "😔"], ["👆", "☝️"], ["🔒", "🔓"]] },
-  { taille: 9, paires: [["😀", "😁"], ["😐", "😑"], ["🔁", "🔂"], ["📁", "📂"], ["🇦🇹", "🇱🇻"], ["😺", "😸"], ["📃", "📄"], ["😗", "😙"]] },
-  { taille: 12, paires: [["😃", "😄"], ["😗", "😚"], ["🕐", "🕑"], ["🇳🇱", "🇱🇺"], ["😮", "😯"], ["🙁", "☹️"], ["✋", "🤚"], ["🔈", "🔉"]] },
+// Trouve l'intrus : [emoji de la grille, intrus]. À chaque partie on tire 8 paires dans cette réserve
+// (en évitant celles de la partie d'avant), l'intrus tombe à une place au hasard, et un côté sur deux on inverse les rôles.
+// Règle de tri (ses retours du 27-10) : UN petit détail seulement, jamais une couleur, un miroir ou un objet différent ; pas de mains (trop simple).
+const RESERVE = [
+  ["🙂", "🙃"], ["📪", "📫"], ["🐪", "🐫"], ["🇸🇳", "🇲🇱"], ["🕐", "🕜"], ["😞", "😔"], ["🔒", "🔓"],
+  ["😀", "😁"], ["😐", "😑"], ["🔁", "🔂"], ["📁", "📂"], ["🇦🇹", "🇱🇻"], ["😺", "😸"], ["📃", "📄"], ["😗", "😙"],
+  ["😃", "😄"], ["😗", "😚"], ["🕐", "🕑"], ["🇳🇱", "🇱🇺"], ["😮", "😯"], ["🙁", "☹️"], ["🔈", "🔉"],
+  ["😕", "🫤"], ["😨", "😰"], ["😧", "😦"], ["🕗", "🕘"], ["😌", "😊"], ["🌤️", "⛅"],
+  ["🕒", "🕞"], ["🕔", "🕕"], ["😙", "😚"], ["😶", "😐"], ["😯", "😦"], ["😒", "😑"], ["🇸🇮", "🇸🇰"], ["🇦🇺", "🇳🇿"],
 ];
+const TAILLES = [6, 9, 12];
+function tirerPaires(n) {
+  let recentes = [];
+  try { recentes = JSON.parse(localStorage.getItem("intrus-recentes") || "[]"); } catch (e) {}
+  const cle = p => [...p].sort().join("|");   // même clé quel que soit le sens
+  const melange = a => a.map(v => [Math.random(), v]).sort((x, y) => x[0] - y[0]).map(v => v[1]);
+  const neuves = melange(RESERVE.filter(p => !recentes.includes(cle(p)))), vues = melange(RESERVE.filter(p => recentes.includes(cle(p))));
+  const choix = [...neuves, ...vues].slice(0, n).map(p => Math.random() < .5 ? p : [p[1], p[0]]);
+  try { localStorage.setItem("intrus-recentes", JSON.stringify(choix.map(cle).concat(recentes).slice(0, 24))); } catch (e) {}
+  return choix;
+}
 const LOGOS = window.MANCHES;
 const $ = id => document.getElementById(id);
 const tableau = $("tableau");
@@ -249,7 +264,7 @@ $("grille").addEventListener("pointerdown", e => {
 tableau.addEventListener("pointerdown", () => { if (tableau.classList.contains("fini")) menu(); });
 
 function lancer() {
-  items = jeu === "logo" ? LOGOS[manche].logos : grillesIntrus(INTRUS[manche]);
+  items = jeu === "logo" ? LOGOS[manche].logos : grillesIntrus({ taille: TAILLES[manche], paires: tirerPaires(8) });
   k = 0; bons = 0; cumul = 0; depuis = null;
   $("titre-jeu").textContent = jeu === "logo" ? "Trouve le bon logo" : "Trouve l'intrus";
   $("logos").style.display = jeu === "logo" ? "" : "none";
