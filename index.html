@@ -34,6 +34,7 @@
   body.en-jeu #tableau { display: block; }
   #nom { text-align: center; font-size: min(5.6vw, 26px); min-height: 1.3em; margin-bottom: 10px; opacity: 0; transition: opacity .25s; }
   #tableau.repondu #nom { opacity: 1; }
+  #tableau.penalite #nom { opacity: 1; color: var(--rouge); }
 
   /* Trouve le bon logo : 2 cartes côte à côte */
   #logos { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
@@ -106,7 +107,7 @@
     <div class="choix" data-c="B"><span class="lettre">B</span><img id="imgB" alt=""></div>
   </div>
   <div id="grille"></div>
-  <div id="fin" class="contour"><b id="fin-score"></b><span>Et toi, t'as fait combien ?</span></div>
+  <div id="fin" class="contour"><b id="fin-score"></b><span id="fin-question"></span></div>
 </div>
 
 <div id="pret" class="contour">Lance l'enregistrement d'écran<br>puis touche pour commencer</div>
@@ -168,7 +169,21 @@ function grillesIntrus(m) {
   });
 }
 
-function compteur() { $("compte").textContent = "✓ " + bons + "  ·  " + Math.min(k + 1, items.length) + "/" + items.length; }
+// Trouve l'intrus se joue au chrono : il tourne tant qu'une grille est à l'écran, une erreur coûte PENALITE.
+const PENALITE = 2000;
+let cumul = 0, depuis = null, boucle;
+const temps = () => cumul + (depuis ? performance.now() - depuis : 0);
+const format = ms => (ms / 1000).toFixed(1).replace(".", ",") + " s";
+function chrono(marche) {
+  if (marche && !depuis) depuis = performance.now();
+  if (!marche && depuis) { cumul += performance.now() - depuis; depuis = null; }
+}
+function tic() { if (jeu === "intrus" && document.body.classList.contains("en-jeu")) compteur(); boucle = requestAnimationFrame(tic); }
+
+function compteur() {
+  const rang = Math.min(k + 1, items.length) + "/" + items.length;
+  $("compte").textContent = jeu === "intrus" ? rang + "  ·  " + format(temps()) : "✓ " + bons + "  ·  " + rang;
+}
 
 function afficher() {
   verrou = false;
@@ -176,11 +191,14 @@ function afficher() {
   $("nom").textContent = "";
   compteur();
   if (k >= items.length) {
+    chrono(false);
     tableau.classList.add("fini");
-    $("fin-score").textContent = bons + " / " + items.length;
+    $("fin-score").textContent = jeu === "intrus" ? format(temps()) : bons + " / " + items.length;
+    $("fin-question").textContent = jeu === "intrus" ? "Et toi, tu fais mieux\u00a0?" : "Et toi, t'as fait combien\u00a0?";
     $("compte").textContent = "Terminé";
     return;
   }
+  if (jeu === "intrus") chrono(true);
   const it = items[k];
   if (jeu === "logo") {
     $("imgA").src = it.a; $("imgB").src = it.b;
@@ -218,20 +236,26 @@ document.querySelectorAll(".choix").forEach(c => c.addEventListener("pointerdown
   repondre(c, c.dataset.c === it.bon, document.querySelector(`.choix[data-c="${it.bon}"]`), it.nom);
 }));
 $("grille").addEventListener("pointerdown", e => {
-  const d = e.target.closest("#grille > div"); if (!d || !items[k]) return;
-  repondre(d, d.dataset.i === "1", $("grille").querySelector('[data-i="1"]'));
+  const d = e.target.closest("#grille > div"); if (!d || !items[k] || verrou) return;
+  if (d.dataset.i === "1") { chrono(false); return repondre(d, true); }
+  // mauvaise case : elle tremble en rouge, +2 s, on continue de chercher
+  cumul += PENALITE; compteur();
+  d.classList.remove("faux"); void d.offsetWidth; d.classList.add("faux");
+  d.querySelector(".pastille")?.remove(); pastille(d, false);
+  $("nom").textContent = "+" + PENALITE / 1000 + " s"; tableau.classList.add("penalite");
+  clearTimeout(d.efface); d.efface = setTimeout(() => { d.classList.remove("faux"); d.querySelector(".pastille")?.remove(); tableau.classList.remove("penalite"); }, 700);
 });
 tableau.addEventListener("pointerdown", () => { if (tableau.classList.contains("fini")) menu(); });
 
 function lancer() {
   items = jeu === "logo" ? LOGOS[manche].logos : grillesIntrus(INTRUS[manche]);
-  k = 0; bons = 0;
+  k = 0; bons = 0; cumul = 0; depuis = null;
   $("titre-jeu").textContent = jeu === "logo" ? "Trouve le bon logo" : "Trouve l'intrus";
   $("logos").style.display = jeu === "logo" ? "" : "none";
   $("grille").style.display = jeu === "intrus" ? "" : "none";
   document.body.classList.add("pret");
 }
-function menu() { clearTimeout(suite); document.body.classList.remove("en-jeu", "pret"); $("titre-jeu").textContent = ""; $("compte").textContent = ""; }
+function menu() { clearTimeout(suite); chrono(false); document.body.classList.remove("en-jeu", "pret"); $("titre-jeu").textContent = ""; $("compte").textContent = ""; }
 
 $("choix-jeu").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return;
   jeu = b.dataset.jeu; $("choix-jeu").querySelectorAll("button").forEach(x => x.classList.toggle("choisi", x === b)); });
@@ -246,6 +270,7 @@ $("compte").addEventListener("pointerdown", () => { minuteur = setTimeout(menu, 
 ["pointerup", "pointerleave", "pointercancel"].forEach(t => $("compte").addEventListener(t, () => clearTimeout(minuteur)));
 
 camera();
+tic();
 </script>
 </body>
 </html>
