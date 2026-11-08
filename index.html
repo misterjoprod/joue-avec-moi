@@ -74,20 +74,51 @@
   #star.bon img { border-color: var(--vert); }
   #star.faux img { border-color: var(--rouge); }
   #star .pastille { right: -12px; top: -12px; width: 52px; height: 52px; font-size: 30px; }
-  #barre { position: absolute; left: 12px; right: 12px; bottom: 12px; height: 10px; border-radius: 6px; background: rgba(0,0,0,.35); overflow: hidden; }
+
+  /* Retrouve le mot : tuiles noires (mot mélangé) -> vertes (trouvé) ou rouges (raté), comme sa pastille */
+  #mot { display: flex; gap: var(--g); justify-content: center; padding: 18px 0; }
+  #mot span { flex: none; width: var(--t); height: calc(var(--t) * 1.3); display: flex; align-items: center; justify-content: center;
+    background: #111; color: #fff; border-radius: calc(var(--t) * .16); font-weight: 900; font-size: calc(var(--t) * .8);
+    box-shadow: 0 4px 0 rgba(0,0,0,.45); transition: background .2s; }
+  #mot.bon span { background: var(--vert); animation: pop .35s cubic-bezier(.3,1.8,.5,1) backwards; }
+  #mot.faux span { background: var(--rouge); animation: pop .35s cubic-bezier(.3,1.8,.5,1) backwards; }
+
+  /* Vrai ou faux : UN logo, on dit (ou touche) vrai / faux ; si c'était un faux, le vrai apparaît à côté */
+  #vf { width: min(80vw, calc(100vh - 300px), 460px); }
+  #vf-logos { display: flex; gap: 12px; justify-content: center; }
+  .carte-vf { position: relative; flex: 1; max-width: 100%; aspect-ratio: 1; background: var(--carte); border-radius: 20px; border: 5px solid transparent;
+    transition: border-color .2s; }
+  .carte-vf img { position: absolute; inset: 12%; width: 76%; height: 76%; object-fit: contain; }
+  .carte-vf .etiquette { position: absolute; left: 0; right: 0; bottom: 100%; margin-bottom: 4px; text-align: center; font-size: min(4vw, 18px); }
+  #carte-reel { display: none; animation: pop .35s cubic-bezier(.3,1.8,.5,1); }
+  #vf.montre-reel #carte-reel { display: block; }
+  #vf.bon #carte-vf { border-color: var(--vert); }
+  #vf.faux #carte-vf { border-color: var(--rouge); animation: tremble .4s; }
+  #vf.montre-reel #carte-reel { border-color: var(--vert); }
+  #boutons-vf { display: flex; gap: 12px; margin-top: 12px; }
+  #boutons-vf button { flex: 1; font: 900 min(6vw, 26px) var(--police); text-transform: uppercase; color: #fff; border: 3px solid #000;
+    border-radius: 16px; padding: 12px 6px; -webkit-text-stroke: .06em #000; paint-order: stroke fill; }
+  #boutons-vf [data-v="1"] { background: var(--vert); }
+  #boutons-vf [data-v="0"] { background: var(--rouge); }
+  #vf.bon #boutons-vf, #vf.faux #boutons-vf { visibility: hidden; }
+  #vf .pastille { right: -10px; top: -10px; }
+
+  /* jeux à la voix (star, mot, vrai/faux) : jauge de temps sous le jeu, ce qu'il entend au-dessus du tableau */
+  #barre { display: none; height: 10px; margin: 10px 6px 2px; border-radius: 6px; background: rgba(0,0,0,.35); overflow: hidden; }
+  body.voix #barre { display: block; }
+  #tableau.repondu #barre, #tableau.fini #barre { visibility: hidden; }
   #barre i { display: block; height: 100%; width: 100%; background: var(--jaune); transform-origin: left; }
-  #star.bon #barre, #star.faux #barre { opacity: 0; }
-  body.mode-star #tableau { width: fit-content; max-width: calc(100% - 24px); padding: 8px; border-radius: 24px; }
-  body.mode-star #nom { position: absolute; left: 0; right: 0; bottom: 100%; margin: 0 0 8px; opacity: 1; }
-  body.mode-star #fin { width: min(72vw, 440px); }
+  body.voix #tableau { width: fit-content; max-width: calc(100% - 24px); padding: 8px; border-radius: 24px; }
+  body.voix #nom { position: absolute; left: 0; right: 0; bottom: 100%; margin: 0 0 8px; opacity: 1; }
+  body.voix #fin { width: min(72vw, 440px); }
   #nom.entendu { font-size: min(4.4vw, 20px); opacity: .85 !important; text-transform: none; }
   #nom.vert { color: var(--vert); }
   #nom.rouge { color: var(--rouge); }
-  #tableau.fini #star { display: none; }
+  #tableau.fini #star, #tableau.fini #mot, #tableau.fini #vf { display: none !important; }
   /* micro : petit point en haut à droite (rouge = il écoute, gris = coupé, touche l'écran pour le relancer) */
   #micro { position: fixed; right: 14px; top: calc(env(safe-area-inset-top, 0px) + 14px); width: 14px; height: 14px; border-radius: 50%;
     background: #777; border: 2px solid #000; display: none; }
-  body.mode-star.en-jeu #micro { display: block; }
+  body.voix.en-jeu #micro { display: block; }
   #micro.on { background: var(--rouge); animation: pulse 1.2s infinite; }
   @keyframes pulse { 50% { opacity: .45; } }
 
@@ -139,7 +170,16 @@
     <div class="choix" data-c="B"><span class="lettre">B</span><img id="imgB" alt=""></div>
   </div>
   <div id="grille"></div>
-  <div id="star"><img id="imgStar" alt=""><div id="barre"><i></i></div></div>
+  <div id="star"><img id="imgStar" alt=""></div>
+  <div id="mot"></div>
+  <div id="vf">
+    <div id="vf-logos">
+      <div class="carte-vf" id="carte-vf"><img id="imgVF" alt=""></div>
+      <div class="carte-vf" id="carte-reel"><span class="etiquette contour" style="color:var(--vert)">Le vrai</span><img id="imgReel" alt=""></div>
+    </div>
+    <div id="boutons-vf"><button data-v="1">Vrai</button><button data-v="0">Faux</button></div>
+  </div>
+  <div id="barre"><i></i></div>
   <div id="fin" class="contour"><b id="fin-score"></b><span id="fin-question"></span></div>
 </div>
 
@@ -153,6 +193,15 @@
     <button data-jeu="intrus">Intrus</button>
     <button data-jeu="star">Star</button>
   </div>
+  <div class="ligne" id="choix-jeu2">
+    <button data-jeu="mot">Mot mélangé</button>
+    <button data-jeu="vf">Vrai ou faux</button>
+  </div>
+  <div class="ligne" id="choix-temps" style="display:none">
+    <button data-t="5000">5 s</button>
+    <button data-t="10000" class="choisi">10 s</button>
+    <button data-t="15000">15 s</button>
+  </div>
   <div class="ligne" id="choix-manche">
     <button data-m="0" class="choisi">Manche 1</button>
     <button data-m="1">Manche 2</button>
@@ -160,12 +209,12 @@
   </div>
   <button id="go">C'est parti</button>
   <p id="aide">Touche la bonne réponse : elle s'allume et on passe à la suivante.<br>Appui long sur le compteur en haut = retour au menu.</p>
-  <p id="aide-star" style="display:none">Star : dis le nom à voix haute, la photo se retourne. 10 s par star, « je passe » pour passer.<br>
-    Appui long sur le compteur en haut = retour au menu. <a href="credits-photos.txt" style="color:#cfcfd6">Crédits photos</a></p>
+  <p id="aide-star" style="display:none"></p>
 </div>
 
 <script src="logos.js"></script>
 <script src="stars.js"></script>
+<script src="mots.js"></script>
 <script>
 // Trouve l'intrus : [emoji de la grille, intrus]. À chaque partie on tire 8 paires dans cette réserve
 // (en évitant celles de la partie d'avant), l'intrus tombe à une place au hasard, et un côté sur deux on inverse les rôles.
@@ -233,8 +282,10 @@ function chrono(marche) {
 }
 function tic() { if (jeu === "intrus" && document.body.classList.contains("en-jeu")) compteur(); boucle = requestAnimationFrame(tic); }
 
-// ---------- Retrouve la star : reconnaissance vocale ----------
-const TEMPS_STAR = 10000;   // temps par photo
+// ---------- Jeux à la voix : Retrouve la star, Retrouve le mot, Vrai ou faux ----------
+const VOIX = ["star", "mot", "vf"];
+const aVoix = () => VOIX.includes(jeu);
+let TEMPS = 10000;   // temps par question (menu : 5 / 10 / 15 s)
 const PASSE = ["je passe", "passe", "suivant", "joker"];
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 STARS.forEach(m => m.stars.forEach(s => { const i = new Image(); i.src = s.photo; }));
@@ -250,20 +301,26 @@ function lev(a, b) {
   }
   return p[b.length];
 }
-function ditUnDe(texte, reponses) {
+// tolerance(longueur) = nombre de fautes acceptées ; par défaut celle des stars
+function ditUnDe(texte, reponses, tolerance = l => l < 5 ? 0 : Math.floor(l * .22)) {
   const mots = norm(texte).split(" ").filter(Boolean);
   return reponses.some(r => {
-    const cible = norm(r).replace(/ /g, ""), n = norm(r).split(" ").length;
-    const tol = cible.length < 5 ? 0 : Math.floor(cible.length * .22);
+    const cible = norm(r).replace(/ /g, ""), n = norm(r).split(" ").length, tol = tolerance(cible.length);
     for (let t = Math.max(1, n - 1); t <= n + 1; t++)
       for (let i = 0; i + t <= mots.length; i++)
         if (lev(mots.slice(i, i + t).join(""), cible) <= tol) return true;
     return false;
   });
 }
+// mot mélangé : le mot exact (au pluriel près), une faute seulement à partir de 8 lettres
+const tolMot = l => l >= 8 ? 1 : 0;
+const pluriel = m => [m, m + "s", m + "x"];
+// vrai / faux : le dernier mot entendu décide (la dictée écrit parfois « faut » ou « vrais »)
+const MOTS_VRAI = ["vrai", "vrais", "vraie", "c est vrai", "le vrai"], MOTS_FAUX = ["faux", "faut", "fausse", "fo", "c est faux", "le faux"];
+const finitPar = (p, liste) => { const n = norm(p); return liste.some(x => n === x || n.endsWith(" " + x)); };
 
-let reco = null, ecoute = false, refuse = false, derniers = null, deja = new Map(), finStar = 0, minuteStar, barre;
-// ce qui a déjà été dit avant la photo actuelle ne compte pas (la reconnaissance tourne en continu)
+let reco = null, ecoute = false, refuse = false, derniers = null, deja = new Map(), finQ = 0, minuteQ, barre;
+// ce qui a déjà été dit avant la question actuelle ne compte pas (la reconnaissance tourne en continu)
 function oublier() { deja = new Map(); if (derniers) for (let i = 0; i < derniers.length; i++) deja.set(i, derniers[i][0].transcript.length); }
 function micro() {
   if (!SR || ecoute) return;
@@ -272,9 +329,9 @@ function micro() {
     reco.lang = "fr-FR"; reco.continuous = true; reco.interimResults = true; reco.maxAlternatives = 3;
     reco.onstart = () => { ecoute = true; derniers = null; deja = new Map(); $("micro").classList.add("on"); };
     reco.onend = () => { ecoute = false; $("micro").classList.remove("on");
-      if (!refuse && jeu === "star" && document.body.classList.contains("en-jeu")) setTimeout(micro, 150); };
+      if (!refuse && aVoix() && document.body.classList.contains("en-jeu")) setTimeout(micro, 150); };
     reco.onerror = e => { console.warn("reconnaissance", e.error);
-      if (e.error === "not-allowed" || e.error === "service-not-allowed") { refuse = true;
+      if ((e.error === "not-allowed" || e.error === "service-not-allowed") && !verrou) { refuse = true;
         $("nom").textContent = "Micro / dictée refusés : Réglages > Safari > Micro, et active Dictée"; $("nom").className = "contour entendu"; } };
     reco.onresult = e => { derniers = e.results; entendre(); };
   }
@@ -284,7 +341,7 @@ function couperMicro() { if (reco && ecoute) try { reco.abort(); } catch (e) {} 
 window.__dit = texte => { derniers = [...(derniers || []), [{ transcript: texte }]]; entendre(); };   // test sans micro (ajoute une phrase à la session)
 
 function entendre() {
-  const it = items[k]; if (jeu !== "star" || !it || verrou || !derniers) return;
+  const it = items[k]; if (!aVoix() || !it || verrou || !derniers) return;
   const phrases = [];
   for (let i = 0; i < derniers.length; i++) {
     const r = derniers[i], coupe = deja.get(i) || 0;
@@ -293,32 +350,80 @@ function entendre() {
   const dernier = derniers[derniers.length - 1];
   const vu = dernier ? dernier[0].transcript.slice(deja.get(derniers.length - 1) || 0).trim() : "";
   if (vu) { $("nom").textContent = "« " + vu + " »"; $("nom").className = "contour entendu"; }
-  if (phrases.some(p => ditUnDe(p, it.ok))) return reveler(true);
-  if (phrases.some(p => { const n = norm(p); return PASSE.some(x => n === x || n.endsWith(" " + x)); })) return reveler(false);
+  if (jeu === "star" && phrases.some(p => ditUnDe(p, it.ok))) return reveler(true);
+  if (jeu === "mot" && phrases.some(p => ditUnDe(p, pluriel(it.mot), tolMot))) return reveler(true);
+  if (jeu === "vf") {
+    // on ne regarde que la réponse la plus probable de la dernière phrase : « vrai… non faux » = faux
+    const p = vu;
+    if (finitPar(p, MOTS_VRAI)) return reveler(it.vrai === true, true);
+    if (finitPar(p, MOTS_FAUX)) return reveler(it.vrai === false, true);
+  }
+  if (phrases.some(p => finitPar(p, PASSE))) return reveler(false);
 }
 
-function reveler(ok) {
+// ok = bonne réponse ; repondu = il a donné une réponse (vrai/faux), sinon temps écoulé ou « je passe »
+function reveler(ok, repondu) {
   if (verrou) return;
-  verrou = true; clearTimeout(minuteStar); cancelAnimationFrame(barre);
+  verrou = true; clearTimeout(minuteQ); cancelAnimationFrame(barre);
   if (ok) bons++;
-  const st = $("star"); st.classList.add(ok ? "bon" : "faux"); pastille(st, ok);
-  $("nom").textContent = items[k].nom; $("nom").className = "contour " + (ok ? "vert" : "rouge");
+  const it = items[k];
+  if (jeu === "star") {
+    const st = $("star"); st.classList.add(ok ? "bon" : "faux"); pastille(st, ok);
+    $("nom").textContent = it.nom; $("nom").className = "contour " + (ok ? "vert" : "rouge");
+  } else if (jeu === "mot") {
+    tuiles(it.mot, ok ? "bon" : "faux");
+    $("nom").textContent = ""; $("nom").className = "contour";
+  } else {
+    const v = $("vf"); v.classList.add(ok ? "bon" : "faux"); pastille($("carte-vf"), ok);
+    if (!it.vrai) v.classList.add("montre-reel");
+    $("nom").textContent = (it.vrai ? "C'était le vrai" : "C'était un faux") + (!repondu ? " · trop tard" : "");
+    $("nom").className = "contour " + (ok ? "vert" : "rouge");
+  }
   tableau.classList.add("repondu");
   compteur();
-  suite = setTimeout(() => { k++; afficher(); }, ok ? 1500 : 2000);
+  suite = setTimeout(() => { k++; afficher(); }, jeu === "vf" && !it.vrai ? 2200 : ok ? 1500 : 2000);
 }
-function afficherStar(it) {
-  const st = $("star"); st.className = ""; st.querySelector(".pastille")?.remove();
-  $("imgStar").src = it.photo;
+// tuiles du mot (accents retirés, comme sa pastille) ; taille selon la longueur
+function tuiles(mot, etat) {
+  const lettres = [...mot.normalize("NFD").replace(/[̀-ͯ]/g, "")];
+  const m = $("mot"); m.className = etat || "";
+  // la rangée prend toute la largeur dispo (écran - marges du tableau) ; espaces serrés pour les mots longs
+  const n = lettres.length, g = n > 9 ? 3 : 5, W = Math.min(innerWidth - 44, 620);
+  m.style.setProperty("--g", g + "px");
+  m.style.setProperty("--t", Math.min(60, (W - g * (n - 1)) / n) + "px");
+  m.innerHTML = lettres.map((l, i) => `<span style="animation-delay:${i * 35}ms">${l}</span>`).join("");
+}
+function afficherVoix(it) {
   $("nom").textContent = ""; $("nom").className = "contour";
+  if (jeu === "star") {
+    const st = $("star"); st.className = ""; st.querySelector(".pastille")?.remove();
+    $("imgStar").src = it.photo;
+  } else if (jeu === "mot") {
+    tuiles(it.melange);
+  } else {
+    $("vf").className = ""; $("carte-vf").querySelector(".pastille")?.remove();
+    $("imgVF").src = it.src; $("imgReel").src = it.reel;
+  }
   oublier();
-  finStar = performance.now() + TEMPS_STAR;
-  minuteStar = setTimeout(() => reveler(false), TEMPS_STAR);
+  finQ = performance.now() + TEMPS;
+  minuteQ = setTimeout(() => reveler(false), TEMPS);
   const jauge = $("barre").firstElementChild;
-  const anim = () => { jauge.style.transform = `scaleX(${Math.max(0, (finStar - performance.now()) / TEMPS_STAR)})`; barre = requestAnimationFrame(anim); };
+  const anim = () => { jauge.style.transform = `scaleX(${Math.max(0, (finQ - performance.now()) / TEMPS)})`; barre = requestAnimationFrame(anim); };
   anim();
   micro();
 }
+// Vrai ou faux : les 12 logos de la manche, 6 montrés en vrai et 6 en faux, dans un ordre mélangé
+function questionsVF(logos) {
+  const vrais = logos.map((_, i) => i < logos.length / 2).sort(() => Math.random() - .5);
+  return logos.map((l, i) => {
+    const reel = l.bon === "A" ? l.a : l.b, faux = l.bon === "A" ? l.b : l.a;
+    return { nom: l.nom, vrai: vrais[i], src: vrais[i] ? reel : faux, reel };
+  }).sort(() => Math.random() - .5);
+}
+$("boutons-vf").addEventListener("pointerdown", e => {
+  const b = e.target.closest("button"); if (!b || jeu !== "vf" || verrou || !items[k]) return;
+  reveler(items[k].vrai === (b.dataset.v === "1"), true);
+});
 
 function compteur() {
   const rang = Math.min(k + 1, items.length) + "/" + items.length;
@@ -340,7 +445,7 @@ function afficher() {
   }
   if (jeu === "intrus") chrono(true);
   const it = items[k];
-  if (jeu === "star") return afficherStar(it);
+  if (aVoix()) return afficherVoix(it);
   if (jeu === "logo") {
     $("imgA").src = it.a; $("imgB").src = it.b;
     document.querySelectorAll(".choix").forEach(c => { c.className = "choix"; c.querySelector(".pastille")?.remove(); });
@@ -387,31 +492,46 @@ $("grille").addEventListener("pointerdown", e => {
   clearTimeout(d.efface); d.efface = setTimeout(() => { d.classList.remove("faux"); d.querySelector(".pastille")?.remove(); tableau.classList.remove("penalite"); }, 700);
 });
 tableau.addEventListener("pointerdown", () => { if (tableau.classList.contains("fini")) menu(); });
-// star : toucher l'écran relance le micro s'il s'est coupé ; sans reconnaissance vocale (navigateur qui ne la gère pas), toucher la photo = trouvé
+// jeux à la voix : toucher l'écran relance le micro s'il s'est coupé ;
+// sans reconnaissance vocale (navigateur qui ne la gère pas), toucher la photo / les tuiles = trouvé
 document.addEventListener("pointerdown", e => {
-  if (jeu !== "star" || !document.body.classList.contains("en-jeu") || tableau.classList.contains("fini")) return;
-  if (!SR) { if (e.target.closest("#star")) reveler(true); return; }
+  if (!aVoix() || !document.body.classList.contains("en-jeu") || tableau.classList.contains("fini")) return;
+  if (!SR) { if (e.target.closest("#star, #mot")) reveler(true); return; }
   refuse = false; micro();
 });
 
 function lancer() {
-  items = jeu === "logo" ? LOGOS[manche].logos : jeu === "star" ? STARS[manche].stars : grillesIntrus({ taille: TAILLES[manche], paires: tirerPaires(8) });
+  items = jeu === "logo" ? LOGOS[manche].logos : jeu === "star" ? STARS[manche].stars : jeu === "mot" ? MOTS[manche].mots
+    : jeu === "vf" ? questionsVF(LOGOS[manche].logos) : grillesIntrus({ taille: TAILLES[manche], paires: tirerPaires(8) });
   k = 0; bons = 0; cumul = 0; depuis = null;
-  $("titre-jeu").textContent = { logo: "Trouve le bon logo", intrus: "Trouve l'intrus", star: "Retrouve la star" }[jeu];
+  $("titre-jeu").textContent = { logo: "Trouve le bon logo", intrus: "Trouve l'intrus", star: "Retrouve la star", mot: "Retrouve le mot", vf: "Vrai ou faux logo ?" }[jeu];
   $("logos").style.display = jeu === "logo" ? "" : "none";
   $("grille").style.display = jeu === "intrus" ? "" : "none";
-  $("star").style.display = jeu === "star" ? "" : "none";
+  ["star", "mot", "vf"].forEach(j => $(j).style.display = jeu === j ? "" : "none");
   document.body.classList.toggle("mode-intrus", jeu === "intrus");
-  document.body.classList.toggle("mode-star", jeu === "star");
+  document.body.classList.toggle("voix", aVoix());
   document.body.classList.add("pret");
-  if (jeu === "star") micro();   // demande l'autorisation du micro maintenant, avant l'enregistrement d'écran
+  if (aVoix()) micro();   // demande l'autorisation du micro maintenant, avant l'enregistrement d'écran
 }
-function menu() { clearTimeout(suite); clearTimeout(minuteStar); cancelAnimationFrame(barre); couperMicro(); chrono(false); document.body.classList.remove("en-jeu", "pret"); $("titre-jeu").textContent = ""; $("compte").textContent = ""; }
+function menu() { clearTimeout(suite); clearTimeout(minuteQ); cancelAnimationFrame(barre); couperMicro(); chrono(false); document.body.classList.remove("en-jeu", "pret"); $("titre-jeu").textContent = ""; $("compte").textContent = ""; }
 
-$("choix-jeu").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return;
-  jeu = b.dataset.jeu; $("choix-jeu").querySelectorAll("button").forEach(x => x.classList.toggle("choisi", x === b));
-  $("aide").style.display = jeu === "star" ? "none" : ""; $("aide-star").style.display = jeu === "star" ? "" : "none";
-  if (jeu === "star" && !SR) $("aide-star").textContent = "⚠️ Ce navigateur ne reconnaît pas la voix (prends Safari sur iPhone, ou Chrome). Ici : touche la photo quand tu as trouvé."; });
+const AIDES = {
+  star: "Dis le nom de la star à voix haute : la photo se retourne. « Je passe » pour passer.",
+  mot: "Dis le mot à voix haute : les lettres se remettent dans l'ordre. « Je passe » pour passer.",
+  vf: "Dis « vrai » ou « faux » (ou touche le bouton). Si c'était un faux, le vrai logo apparaît à côté.",
+};
+function choisirJeu(b) {
+  jeu = b.dataset.jeu;
+  document.querySelectorAll("#choix-jeu button, #choix-jeu2 button").forEach(x => x.classList.toggle("choisi", x === b));
+  $("aide").style.display = aVoix() ? "none" : ""; $("aide-star").style.display = aVoix() ? "" : "none";
+  $("choix-temps").style.display = aVoix() ? "" : "none";
+  if (aVoix()) $("aide-star").innerHTML = (SR ? AIDES[jeu] : "⚠️ Ce navigateur ne reconnaît pas la voix (prends Safari sur iPhone, ou Chrome). Ici : touche la photo / les lettres quand tu as trouvé.")
+    + "<br>Appui long sur le compteur en haut = retour au menu."
+    + (jeu === "star" ? ' <a href="credits-photos.txt" style="color:#cfcfd6">Crédits photos</a>' : "");
+}
+["choix-jeu", "choix-jeu2"].forEach(id => $(id).addEventListener("click", e => { const b = e.target.closest("button"); if (b) choisirJeu(b); }));
+$("choix-temps").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return;
+  TEMPS = +b.dataset.t; $("choix-temps").querySelectorAll("button").forEach(x => x.classList.toggle("choisi", x === b)); });
 $("choix-manche").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return;
   manche = +b.dataset.m; $("choix-manche").querySelectorAll("button").forEach(x => x.classList.toggle("choisi", x === b)); });
 $("go").addEventListener("click", () => { camera(); lancer(); });
