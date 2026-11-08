@@ -63,6 +63,8 @@
   #grille .pastille { width: 1.3em; height: 1.3em; font-size: .9em; right: -.5em; top: -.6em; border-width: 2px; }
   .bon .pastille { background: var(--vert); }
   .faux .pastille { background: var(--rouge); }
+  /* jeux à la voix : .bon/.faux posés sur le BLOC entier -> pas de ×1,06 ni de tremblement du bloc (ça dépassait du cadre) */
+  #vf.bon, #vf.faux, #mot.bon, #mot.faux { transform: none; animation: none; }
   @keyframes pop { from { transform: scale(0); } to { transform: scale(1); } }
   @keyframes tremble { 20%, 60% { translate: -6px 0; } 40%, 80% { translate: 6px 0; } }
 
@@ -80,21 +82,33 @@
   #mot span { flex: none; width: var(--t); height: calc(var(--t) * 1.3); display: flex; align-items: center; justify-content: center;
     background: #111; color: #fff; border-radius: calc(var(--t) * .16); font-weight: 900; font-size: calc(var(--t) * .8);
     box-shadow: 0 4px 0 rgba(0,0,0,.45); transition: background .2s; }
-  #mot.bon span { background: var(--vert); animation: pop .35s cubic-bezier(.3,1.8,.5,1) backwards; }
-  #mot.faux span { background: var(--rouge); animation: pop .35s cubic-bezier(.3,1.8,.5,1) backwards; }
+  #mot.bon span { background: var(--vert); animation: tombe .32s cubic-bezier(.3,1.4,.5,1) backwards; }
+  #mot.faux span { background: var(--rouge); animation: tombe .32s cubic-bezier(.3,1.4,.5,1) backwards; }
+  /* les lettres tombent en place : aucun grossissement, donc rien ne dépasse du cadre */
+  @keyframes tombe { from { transform: translateY(-40%); opacity: 0; } to { transform: none; opacity: 1; } }
 
   /* Vrai ou faux : UN logo, on dit (ou touche) vrai / faux ; si c'était un faux, le vrai apparaît à côté */
   #vf { width: min(80vw, calc(100vh - 300px), 460px); }
-  #vf-logos { display: flex; gap: 12px; justify-content: center; }
-  .carte-vf { position: relative; flex: 1; max-width: 100%; aspect-ratio: 1; background: var(--carte); border-radius: 20px; border: 5px solid transparent;
-    transition: border-color .2s; }
+  /* le cadre garde TOUJOURS la même taille : si c'était un faux, la carte glisse à gauche en rétrécissant et le vrai
+     arrive à droite (transformations seulement, rien ne bouge dans la mise en page) */
+  #vf-logos { position: relative; width: 100%; aspect-ratio: 1; }
+  .carte-vf { position: absolute; inset: 0; background: var(--carte); border-radius: 20px; border: 5px solid transparent;
+    transition: transform .5s cubic-bezier(.3,1.25,.5,1), opacity .3s, border-color .2s; }
   .carte-vf img { position: absolute; inset: 12%; width: 76%; height: 76%; object-fit: contain; }
-  .carte-vf .etiquette { position: absolute; left: 0; right: 0; bottom: 100%; margin-bottom: 4px; text-align: center; font-size: min(4vw, 18px); }
-  #carte-reel { display: none; animation: pop .35s cubic-bezier(.3,1.8,.5,1); }
-  #vf.montre-reel #carte-reel { display: block; }
+  #carte-reel { opacity: 0; transform: translateX(26%) scale(.2); border-color: var(--vert); }
+  #vf.montre-reel #carte-vf { transform: translateX(-26%) scale(.48); }
+  #vf.montre-reel #carte-reel { opacity: 1; transform: translateX(26%) scale(.48); transition-delay: .12s; }
+  #etiquette-vrai { position: absolute; left: 52%; right: 0; top: 12%; text-align: center; font-size: min(4.6vw, 22px); color: var(--vert);
+    opacity: 0; transition: opacity .3s .35s; }
+  #etiquette-faux { position: absolute; left: 0; right: 52%; top: 12%; text-align: center; font-size: min(4.6vw, 22px); color: var(--rouge);
+    opacity: 0; transition: opacity .3s .35s; }
+  #vf.montre-reel #etiquette-vrai, #vf.montre-reel #etiquette-faux { opacity: 1; }
   #vf.bon #carte-vf { border-color: var(--vert); }
-  #vf.faux #carte-vf { border-color: var(--rouge); animation: tremble .4s; }
-  #vf.montre-reel #carte-reel { border-color: var(--vert); }
+  #vf.faux #carte-vf, #vf.montre-reel #carte-vf { border-color: var(--rouge); }
+  #vf.faux:not(.montre-reel) #carte-vf { animation: tremble .4s; }
+  #vf.montre-reel #carte-vf .pastille { scale: 2; transform-origin: 100% 0; }   /* la carte est à ×0,48 : la pastille garde sa taille */
+  /* remise à zéro entre deux logos : sans transition, sinon on voit la carte « revenir » */
+  #vf.sec .carte-vf, #vf.sec #etiquette-vrai, #vf.sec #etiquette-faux { transition: none !important; }
   #boutons-vf { display: flex; gap: 12px; margin-top: 12px; }
   #boutons-vf button { flex: 1; font: 900 min(6vw, 26px) var(--police); text-transform: uppercase; color: #fff; border: 3px solid #000;
     border-radius: 16px; padding: 12px 6px; -webkit-text-stroke: .06em #000; paint-order: stroke fill; }
@@ -175,7 +189,9 @@
   <div id="vf">
     <div id="vf-logos">
       <div class="carte-vf" id="carte-vf"><img id="imgVF" alt=""></div>
-      <div class="carte-vf" id="carte-reel"><span class="etiquette contour" style="color:var(--vert)">Le vrai</span><img id="imgReel" alt=""></div>
+      <div class="carte-vf" id="carte-reel"><img id="imgReel" alt=""></div>
+      <div id="etiquette-faux" class="contour">Le faux</div>
+      <div id="etiquette-vrai" class="contour">Le vrai</div>
     </div>
     <div id="boutons-vf"><button data-v="1">Vrai</button><button data-v="0">Faux</button></div>
   </div>
@@ -319,52 +335,83 @@ const pluriel = m => [m, m + "s", m + "x"];
 const MOTS_VRAI = ["vrai", "vrais", "vraie", "c est vrai", "le vrai"], MOTS_FAUX = ["faux", "faut", "fausse", "fo", "c est faux", "le faux"];
 const finitPar = (p, liste) => { const n = norm(p); return liste.some(x => n === x || n.endsWith(" " + x)); };
 
-let reco = null, ecoute = false, refuse = false, derniers = null, deja = new Map(), finQ = 0, minuteQ, barre;
-// ce qui a déjà été dit avant la question actuelle ne compte pas (la reconnaissance tourne en continu)
-function oublier() { deja = new Map(); if (derniers) for (let i = 0; i < derniers.length; i++) deja.set(i, derniers[i][0].transcript.length); }
+let reco = null, ecoute = false, refuse = false, abandon = false, derniers = null, deja = new Map(), finQ = 0, debutQ = 0, minuteQ, barre;
+const GRACE = 600;   // vrai/faux et « je passe » : on n'écoute qu'après 0,6 s (le temps que la dictée finisse la phrase d'avant)
+const motsDe = s => norm(s).split(" ").filter(Boolean);
+// Ce qui a été dit avant la question actuelle ne compte pas (la reconnaissance tourne en continu).
+// On retient les MOTS déjà entendus (pas le nombre de lettres) : l'iPhone réécrit souvent la phrase après coup
+// (« vrai » -> « Vrai. » -> « C'est vrai »), et l'ancienne réponse ne doit pas ressortir à la question suivante.
+function oublier() {
+  deja = new Map();
+  if (derniers) for (let i = 0; i < derniers.length; i++) {
+    const alts = [];
+    for (let a = 0; a < derniers[i].length; a++) alts.push(motsDe(derniers[i][a].transcript));
+    deja.set(i, alts);
+  }
+}
+// mots dits depuis le début de la question, pour une phrase qui existait peut-être déjà avant
+function nouveaux(courant, avant) {
+  const c = motsDe(courant);
+  if (!avant || !avant.length) return c;
+  let p = 0;
+  while (p < avant.length && p < c.length && c[p] === avant[p]) p++;
+  if (p === avant.length) return c.slice(p);                    // la phrase a juste continué
+  // phrase réécrite : on se cale sur le dernier mot déjà entendu (même nombre d'occurrences), sinon sur le nombre de mots
+  const der = avant[avant.length - 1], fois = avant.filter(w => w === der).length;
+  for (let i = 0, vus = 0; i < c.length; i++) if (c[i] === der && ++vus === fois) return c.slice(i + 1);
+  return c.slice(Math.min(avant.length, c.length));
+}
 function micro() {
   if (!SR || ecoute) return;
   if (!reco) {
     reco = new SR();
     reco.lang = "fr-FR"; reco.continuous = true; reco.interimResults = true; reco.maxAlternatives = 3;
-    reco.onstart = () => { ecoute = true; derniers = null; deja = new Map(); $("micro").classList.add("on"); };
+    reco.onstart = () => { ecoute = true; abandon = false; derniers = null; deja = new Map(); $("micro").classList.add("on"); };
     reco.onend = () => { ecoute = false; $("micro").classList.remove("on");
       if (!refuse && aVoix() && document.body.classList.contains("en-jeu")) setTimeout(micro, 150); };
     reco.onerror = e => { console.warn("reconnaissance", e.error);
       if ((e.error === "not-allowed" || e.error === "service-not-allowed") && !verrou) { refuse = true;
         $("nom").textContent = "Micro / dictée refusés : Réglages > Safari > Micro, et active Dictée"; $("nom").className = "contour entendu"; } };
-    reco.onresult = e => { derniers = e.results; entendre(); };
+    reco.onresult = e => { if (abandon) return; derniers = e.results; entendre(); };   // rien de l'ancienne session
   }
   try { reco.start(); } catch (e) {}
 }
-function couperMicro() { if (reco && ecoute) try { reco.abort(); } catch (e) {} }
-window.__dit = texte => { derniers = [...(derniers || []), [{ transcript: texte }]]; entendre(); };   // test sans micro (ajoute une phrase à la session)
+function couperMicro() { if (reco && ecoute) { abandon = true; try { reco.abort(); } catch (e) {} } }
+// tests sans micro : __dit ajoute une phrase à la session, __reecrit remplace la dernière (comme la dictée qui se corrige)
+window.__dit = texte => { derniers = [...(derniers || []), [{ transcript: texte }]]; entendre(); };
+window.__reecrit = texte => { derniers = [...(derniers || []).slice(0, -1), [{ transcript: texte }]]; entendre(); };
 
 function entendre() {
   const it = items[k]; if (!aVoix() || !it || verrou || !derniers) return;
-  const phrases = [];
+  const phrases = [], principales = [];   // principales = la version la plus probable de chaque phrase, dans l'ordre
   for (let i = 0; i < derniers.length; i++) {
-    const r = derniers[i], coupe = deja.get(i) || 0;
-    for (let a = 0; a < r.length; a++) phrases.push(r[a].transcript.slice(coupe));
+    const r = derniers[i], avant = deja.get(i);
+    for (let a = 0; a < r.length; a++) {
+      const neuf = nouveaux(r[a].transcript, avant && (avant[a] || avant[0])).join(" ");
+      phrases.push(neuf);
+      if (a === 0 && neuf) principales.push(neuf);
+    }
   }
-  const dernier = derniers[derniers.length - 1];
-  const vu = dernier ? dernier[0].transcript.slice(deja.get(derniers.length - 1) || 0).trim() : "";
+  const vu = principales.join(" ");
   if (vu) { $("nom").textContent = "« " + vu + " »"; $("nom").className = "contour entendu"; }
   if (jeu === "star" && phrases.some(p => ditUnDe(p, it.ok))) return reveler(true);
   if (jeu === "mot" && phrases.some(p => ditUnDe(p, pluriel(it.mot), tolMot))) return reveler(true);
-  if (jeu === "vf") {
-    // on ne regarde que la réponse la plus probable de la dernière phrase : « vrai… non faux » = faux
-    const p = vu;
-    if (finitPar(p, MOTS_VRAI)) return reveler(it.vrai === true, true);
-    if (finitPar(p, MOTS_FAUX)) return reveler(it.vrai === false, true);
+  if (performance.now() - debutQ < GRACE) return;
+  if (jeu === "vf" && principales.length) {
+    // seul le dernier mot dit compte : « vrai… non faux » = faux
+    const p = principales[principales.length - 1];
+    if (finitPar(p, MOTS_VRAI)) return reveler(it.vrai === true, true, true);
+    if (finitPar(p, MOTS_FAUX)) return reveler(it.vrai === false, true, true);
   }
-  if (phrases.some(p => finitPar(p, PASSE))) return reveler(false);
+  if (phrases.some(p => finitPar(p, PASSE))) return reveler(false, false, true);
 }
 
 // ok = bonne réponse ; repondu = il a donné une réponse (vrai/faux), sinon temps écoulé ou « je passe »
-function reveler(ok, repondu) {
+// neuve = repartir d'une session de dictée neuve (le micro se relance tout seul pendant la révélation, ~1,5 s)
+function reveler(ok, repondu, neuve) {
   if (verrou) return;
   verrou = true; clearTimeout(minuteQ); cancelAnimationFrame(barre);
+  if (neuve || jeu === "vf") couperMicro();
   if (ok) bons++;
   const it = items[k];
   if (jeu === "star") {
@@ -388,7 +435,8 @@ function tuiles(mot, etat) {
   const lettres = [...mot.normalize("NFD").replace(/[̀-ͯ]/g, "")];
   const m = $("mot"); m.className = etat || "";
   // la rangée prend toute la largeur dispo (écran - marges du tableau) ; espaces serrés pour les mots longs
-  const n = lettres.length, g = n > 9 ? 3 : 5, W = Math.min(innerWidth - 44, 620);
+  // largeur intérieure réelle du cadre (écran - 12 px de chaque côté - bordure et marge du tableau) moins 16 px de respiration
+  const n = lettres.length, g = n > 9 ? 3 : 5, W = Math.min(innerWidth - 24 - 19 - 16, 600);
   m.style.setProperty("--g", g + "px");
   m.style.setProperty("--t", Math.min(60, (W - g * (n - 1)) / n) + "px");
   m.innerHTML = lettres.map((l, i) => `<span style="animation-delay:${i * 35}ms">${l}</span>`).join("");
@@ -401,11 +449,15 @@ function afficherVoix(it) {
   } else if (jeu === "mot") {
     tuiles(it.melange);
   } else {
-    $("vf").className = ""; $("carte-vf").querySelector(".pastille")?.remove();
+    const v = $("vf");
+    v.className = "sec"; $("carte-vf").querySelector(".pastille")?.remove();
     $("imgVF").src = it.src; $("imgReel").src = it.reel;
+    void v.offsetWidth;                          // applique la remise à zéro sans animation…
+    requestAnimationFrame(() => requestAnimationFrame(() => v.classList.remove("sec")));   // …puis réactive les transitions
   }
   oublier();
-  finQ = performance.now() + TEMPS;
+  debutQ = performance.now();
+  finQ = debutQ + TEMPS;
   minuteQ = setTimeout(() => reveler(false), TEMPS);
   const jauge = $("barre").firstElementChild;
   const anim = () => { jauge.style.transform = `scaleX(${Math.max(0, (finQ - performance.now()) / TEMPS)})`; barre = requestAnimationFrame(anim); };
