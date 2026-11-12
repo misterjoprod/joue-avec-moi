@@ -330,7 +330,45 @@ function ditUnDe(texte, reponses, tolerance = l => l < 5 ? 0 : Math.floor(l * .2
 }
 // mot mélangé : le mot exact (au pluriel près), une faute seulement à partir de 8 lettres
 const tolMot = l => l >= 8 ? 1 : 0;
-const pluriel = m => [m, m + "s", m + "x"];
+const pluriel = m => [m, m + "s", m + "x", ...(/al$/i.test(m) ? [m.slice(0, -2) + "aux"] : []), ...(/ail$/i.test(m) ? [m.slice(0, -3) + "aux"] : [])];
+// mot mélangé, version 12-11 : « à l'oreille » — la dictée écrit parfois un mot qui SE PRONONCE pareil
+// (yaourts, chevaux, cornichons, pizzas, « porte monnaie »…) : on compare aussi des clés de prononciation
+function cleSon(s) {
+  let w = norm(s).replace(/ /g, "");
+  w = w.replace(/eaux?$/, "o").replace(/aux$/, "al").replace(/(.)\1+/g, "$1")
+    .replace(/ph/g, "f").replace(/qu/g, "k").replace(/ch/g, "§").replace(/c(?=[eiy])/g, "s").replace(/c/g, "k")
+    .replace(/g(?=[eiy])/g, "j").replace(/gu(?=[ei])/g, "g").replace(/h/g, "").replace(/y/g, "i")
+    .replace(/eau|au/g, "o").replace(/ai|ei/g, "e").replace(/[ae]n(?=[^aeiou]|$)|[ae]m(?=[bp])/g, "A")
+    .replace(/(ai|ei|i)n(?=[^aeiou]|$)|un(?=[^aeiou]|$)/g, "I").replace(/on(?=[^aeiou]|$)|om(?=[bp])/g, "O")
+    .replace(/(er|ez|et)$/, "e").replace(/[stdxzp]+$/, "").replace(/e$/, "");
+  return w.replace(/(.)\1+/g, "$1");
+}
+// combien de fois le mot est dit dans un texte (fenêtres de 1 à n+1 mots collés, sans chevauchement)
+function compteMot(texte, mot) {
+  const mots = motsDe(texte), cibles = pluriel(mot).map(m => norm(m).replace(/ /g, "")), n = norm(mot).split(" ").length;
+  const tol = tolMot(cibles[0].length), sons = new Set(cibles.map(cleSon));
+  let c = 0;
+  for (let i = 0; i < mots.length; i++)
+    for (let t = n + 1; t >= 1; t--) {
+      if (i + t > mots.length) continue;
+      const w = mots.slice(i, i + t).join("");
+      if (cibles.some(x => lev(w, x) <= tol) || sons.has(cleSon(w))) { c++; i += t - 1; break; }
+    }
+  return c;
+}
+// dans TOUTE la session de dictée (meilleure des alternatives pour chaque phrase) : on ne compare plus le texte
+// d'avant / d'après (la dictée réécrit, fusionne et ponctue ses phrases, et le mot dit pouvait être jeté avec l'ancien texte) :
+// le mot est trouvé dès qu'il apparaît PLUS de fois qu'au moment où les lettres se sont affichées
+function nbMot(mot) {
+  let n = 0;
+  if (derniers) for (let i = 0; i < derniers.length; i++) {
+    let m = 0;
+    for (let a = 0; a < derniers[i].length; a++) m = Math.max(m, compteMot(derniers[i][a].transcript, mot));
+    n += m;
+  }
+  return n;
+}
+let baseMot = 0;   // nombre de fois où le mot était déjà écrit quand la question a commencé
 // vrai / faux : le dernier mot entendu décide (la dictée écrit parfois « faut » ou « vrais »)
 const MOTS_VRAI = ["vrai", "vrais", "vraie", "c est vrai", "le vrai"], MOTS_FAUX = ["faux", "faut", "fausse", "fo", "c est faux", "le faux"];
 const finitPar = (p, liste) => { const n = norm(p); return liste.some(x => n === x || n.endsWith(" " + x)); };
@@ -348,6 +386,7 @@ function oublier() {
     for (let a = 0; a < derniers[i].length; a++) alts.push(motsDe(derniers[i][a].transcript));
     deja.set(i, alts);
   }
+  baseMot = jeu === "mot" && items[k] ? nbMot(items[k].mot) : 0;
 }
 // mots dits depuis le début de la question, pour une phrase qui existait peut-être déjà avant
 function nouveaux(courant, avant) {
@@ -366,7 +405,7 @@ function micro() {
   if (!reco) {
     reco = new SR();
     reco.lang = "fr-FR"; reco.continuous = true; reco.interimResults = true; reco.maxAlternatives = 3;
-    reco.onstart = () => { ecoute = true; abandon = false; derniers = null; deja = new Map(); $("micro").classList.add("on"); };
+    reco.onstart = () => { ecoute = true; abandon = false; derniers = null; deja = new Map(); baseMot = 0; $("micro").classList.add("on"); };
     reco.onend = () => { ecoute = false; $("micro").classList.remove("on");
       if (!refuse && aVoix() && document.body.classList.contains("en-jeu")) setTimeout(micro, 150); };
     reco.onerror = e => { console.warn("reconnaissance", e.error);
@@ -393,9 +432,10 @@ function entendre() {
     }
   }
   const vu = principales.join(" ");
+  if (vu) entendu = vu;
   if (vu) { $("nom").textContent = "« " + vu + " »"; $("nom").className = "contour entendu"; }
   if (jeu === "star" && phrases.some(p => ditUnDe(p, it.ok))) return reveler(true);
-  if (jeu === "mot" && phrases.some(p => ditUnDe(p, pluriel(it.mot), tolMot))) return reveler(true);
+  if (jeu === "mot" && nbMot(it.mot) > baseMot) return reveler(true);
   if (performance.now() - debutQ < GRACE) return;
   if (jeu === "vf" && principales.length) {
     // seul le dernier mot dit compte : « vrai… non faux » = faux
@@ -408,8 +448,18 @@ function entendre() {
 
 // ok = bonne réponse ; repondu = il a donné une réponse (vrai/faux), sinon temps écoulé ou « je passe »
 // neuve = repartir d'une session de dictée neuve (le micro se relance tout seul pendant la révélation, ~1,5 s)
+let entendu = "", main = false;   // texte affiché « … » pendant la question ; validé à la main (touche Entrée)
+function journal(it, ok) {
+  try {
+    const J = JSON.parse(localStorage.getItem("journal-retrouve-le-mot") || "[]");
+    J.push({ quand: new Date().toISOString(), session: MOTS[manche]?.titre, mot: it.mot, ok, main, entendu,
+      brut: derniers ? [...derniers].slice(-2).map(r => r[0].transcript).join(" | ") : "" });
+    localStorage.setItem("journal-retrouve-le-mot", JSON.stringify(J.slice(-2000)));
+  } catch (e) {}
+}
 function reveler(ok, repondu, neuve) {
   if (verrou) return;
+  if (jeu === "mot" && items[k]) journal(items[k], ok);
   verrou = true; clearTimeout(minuteQ); cancelAnimationFrame(barre);
   if (neuve || jeu === "vf") couperMicro();
   if (ok) bons++;
@@ -455,7 +505,7 @@ function afficherVoix(it) {
     void v.offsetWidth;                          // applique la remise à zéro sans animation…
     requestAnimationFrame(() => requestAnimationFrame(() => v.classList.remove("sec")));   // …puis réactive les transitions
   }
-  oublier();
+  oublier(); entendu = ""; main = false;
   debutQ = performance.now();
   finQ = debutQ + TEMPS;
   minuteQ = setTimeout(() => reveler(false), TEMPS);
@@ -588,6 +638,17 @@ $("choix-manche").addEventListener("click", e => { const b = e.target.closest("b
   manche = +b.dataset.m; $("choix-manche").querySelectorAll("button").forEach(x => x.classList.toggle("choisi", x === b)); });
 $("go").addEventListener("click", () => { camera(); lancer(); });
 $("pret").addEventListener("pointerdown", () => { document.body.classList.remove("pret"); document.body.classList.add("en-jeu"); afficher(); });
+
+// Entrée (clavier du Mac, rien ne s'affiche à l'écran) = TROUVÉ, quand on a dit le bon mot et que la dictée ne l'a pas pris
+// J au menu = télécharger le journal de ce que la dictée a écrit pour chaque mot
+document.addEventListener("keydown", e => {
+  const enJeu = document.body.classList.contains("en-jeu") && !tableau.classList.contains("fini");
+  if (e.key === "Enter" && enJeu && aVoix() && !verrou && items[k]) { e.preventDefault(); main = true; reveler(true); return; }
+  if ((e.key === "j" || e.key === "J") && !enJeu) {
+    const b = new Blob([localStorage.getItem("journal-retrouve-le-mot") || "[]"], { type: "application/json" });
+    const a = document.createElement("a"); a.href = URL.createObjectURL(b); a.download = "journal-retrouve-le-mot.json"; a.click();
+  }
+});
 
 // appui long sur le compteur = retour au menu (rien de visible à l'enregistrement)
 let minuteur;
